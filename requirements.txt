@@ -5,3 +5,4 @@ ipykernel
 matplotlib
 kaggle
 tensorflow
+scikit-learn
