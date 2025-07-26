@@ -6,3 +6,4 @@ matplotlib
 kaggle
 tensorflow
 scikit-learn
+ultralytics
