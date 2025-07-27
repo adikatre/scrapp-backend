@@ -1,0 +1,31 @@
+# Map YOLO class names (from TACO) to a disposal bin.
+# This is a starting point; refine for your city/ZIP rules.
+# Examples cover common TACO classes; everything else falls back to "Landfill / Check local rules".
+mapping:
+  aluminum_foil: Recycle_if_clean
+  aluminum_can: Recycle
+  beverage_can: Recycle
+  bottle_cap: Recycle
+  plastic_bottle: Recycle
+  glass_bottle: Recycle
+  plastic_bag: FilmDropoff_or_Landfill
+  plastic_wrapper: Landfill
+  paper: Recycle
+  cardboard: Recycle
+  carton: Recycle
+  newspaper: Recycle
+  cup: Landfill
+  lid: Landfill
+  straw: Landfill
+  cutlery: Landfill
+  food: Compost
+  fruit: Compost
+  vegetable: Compost
+  cigarette: Landfill
+  mask: Landfill
+  glove: Landfill
+  battery: Hazardous_Dropoff
+  electronics: E-waste_Dropoff
+
+# Fallback when a class is not listed above
+default: Landfill / Check local rules
