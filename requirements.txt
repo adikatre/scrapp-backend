@@ -7,3 +7,5 @@ kaggle
 tensorflow
 scikit-learn
 ultralytics
+opencv-python
+pillow
