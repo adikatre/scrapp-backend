@@ -80,13 +80,5 @@ Restart WSL
 
 ## 04) Run the webcam script
 
-python scripts/04_predict_webcam_v4l2.py \
-  --weights runs/detect/taco_yolo11m/weights/best.pt \
-  --device-id /dev/video0 \
-  --bin-map bin_map.yaml \
-  --conf 0.25 --imgsz 640 \
-  --width 1280 --height 720 --fps 30 \
-  --device cpu \
-  --show \
-  --save-vid runs/predict/webcam_out.mp4
+python scripts/04_predict_webcam_v4l2.py   --weights runs/detect/taco_yolo11m/weights/best.pt   --device-id /dev/video0   --bin-map bin_map.yaml   --conf 0.25 --imgsz 640   --width 1280 --height 720 --fps 30   --device cpu   --show   --save-vid runs/predict/webcam_out.mp4
 
