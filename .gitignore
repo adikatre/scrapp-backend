@@ -4,4 +4,5 @@ venv/
 *.env
 *.Identifier
 data/*/*
-*.pt
+trash-yolo/datasets/taco_yolo/*
+trash-yolo/taco-trash-dataset/*
