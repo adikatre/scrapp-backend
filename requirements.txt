@@ -9,3 +9,4 @@ scikit-learn
 ultralytics
 opencv-python
 pillow
+flask-cors

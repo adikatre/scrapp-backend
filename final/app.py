@@ -4,6 +4,7 @@ from PIL import Image
 import numpy as np
 import cv2
 import io
+from flask_cors import CORS
 
 
 #download and load model once server starts.
@@ -39,6 +40,7 @@ for id, name in model.names.items():
         COCO_TO_BIN[name] = default_route
         
 app = Flask(__name__)
+CORS(app)
 
 @app.route("/predict", methods=["POST"])
 def predict():
