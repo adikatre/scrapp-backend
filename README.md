@@ -3,6 +3,8 @@
 [Frontend](https://github.com/SlushEE0/Congressional-App-Challenge-Frontend)
 [Backend](https://github.com/adikatre/Congressional-App-Challenge-Backend)
 
+
+**OLD**
 Next steps:
 1. Add the ability to load the saved dataset then upload an image for the model to make a prediction in recyclable_model.ipynb
 2. Test the current model on images taken from my phone's camera
