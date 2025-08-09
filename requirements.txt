@@ -10,3 +10,4 @@ ultralytics
 opencv-python
 pillow
 flask-cors
+gunicorn
