@@ -5,4 +5,5 @@ venv/
 *.Identifier
 trash-yolo/datasets/taco_yolo/*
 trash-yolo/taco-trash-dataset/*
-final/yolov8x.pt
+
+*.pt
