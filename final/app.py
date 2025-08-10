@@ -59,6 +59,7 @@ def predict():
     results = model.predict([img], conf=0.30, verbose=False)
     r = results[0]
     
+    objects = []
     detections = []
     bin_totals = {}
     
@@ -81,9 +82,11 @@ def predict():
             "confidence": round(conf, 3),
             "bbox": [x1, y1, x2, y2],
             "route": route
-    })
+        })
+        objects.append(name)
         
     return jsonify({
+        "objects": objects,
         "detections": detections,
         "bin_totals": bin_totals
     })
