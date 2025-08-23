@@ -1,12 +1,13 @@
 flask
-twilio
 pandas
 ipykernel
-matplotlib
-kaggle
-tensorflow-cpu==2.15.0
+tensorflow-cpu==2.20.0
 scikit-learn
-ultralytics
+pip install ultralytics --no-deps
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+pip install "ipython>=8.0.0"
+pip install "psutil>=5.9.6"
+pip install "requests>=2.23.0"
 opencv-python
 pillow
 flask-cors
