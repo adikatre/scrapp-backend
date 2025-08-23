@@ -8,7 +8,7 @@ from flask_cors import CORS
 
 
 #download and load model once server starts.
-model = YOLO("yolov8x.pt")
+model = YOLO("yolov8n.pt")
 
 recycle = {
     "bottle", "wine glass", "cup", "bowl",
