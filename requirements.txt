@@ -3,7 +3,7 @@ pandas
 ipykernel
 tensorflow-cpu==2.20.0
 scikit-learn
-ultralytics --no-deps
+--no-deps ultralytics
 torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 ipython>=8.0.0
 psutil>=5.9.6
