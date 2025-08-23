@@ -46,4 +46,4 @@ COPY . .
 EXPOSE 8000
 
 # Run the application.
-CMD ["gunicorn", "venv.lib.python3.12.site-packages.tornado.wsgi", "--bind=0.0.0.0:8000"]
+CMD ["gunicorn", "final.app:app", "--bind", "0.0.0.0:8000"]
