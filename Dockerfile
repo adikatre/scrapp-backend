@@ -33,6 +33,9 @@ RUN adduser \
 # First, copy the requirements file into the container.
 COPY requirements.txt .
 
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install gunicorn
+
 # Download dependencies as a separate step to take advantage of Docker's caching.
 # Leverage a cache mount to /root/.cache/pip to speed up subsequent builds.
 
