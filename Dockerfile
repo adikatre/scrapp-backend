@@ -30,11 +30,11 @@ RUN adduser \
     --uid "${UID}" \
     appuser
 
+# First, copy the requirements file into the container.
+COPY requirements.txt .
+
 # Download dependencies as a separate step to take advantage of Docker's caching.
 # Leverage a cache mount to /root/.cache/pip to speed up subsequent builds.
-# Leverage a bind mount to requirements.txt to avoid having to copy them into
-# into this layer.
-python3 -m pip install -r requirements.txt
 
 # Switch to the non-privileged user to run the application.
 USER appuser
@@ -46,4 +46,4 @@ COPY . .
 EXPOSE 8000
 
 # Run the application.
-CMD gunicorn 'venv.lib.python3.12.site-packages.tornado.wsgi' --bind=0.0.0.0:8000
+CMD ["gunicorn", "final.app:app", "--bind", "0.0.0.0:8000"]
