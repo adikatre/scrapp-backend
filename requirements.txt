@@ -1,12 +1,12 @@
 flask
+twilio
 pandas
 ipykernel
-tensorflow-cpu==2.20.0
+matplotlib
+kaggle
+tensorflow
 scikit-learn
-torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-ipython>=8.0.0
-psutil>=5.9.6
-requests>=2.23.0
+ultralytics
 opencv-python
 pillow
 flask-cors
