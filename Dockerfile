@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # the application crashes without emitting any logs due to buffering.
 ENV PYTHONUNBUFFERED=1
 
-COPY . /
+COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
 
@@ -20,9 +20,6 @@ WORKDIR /app
 
 # Switch to the non-privileged user to run the application.
 EXPOSE 5000
-
-# Copy the source code into the container.
-COPY . .
 
 # Run the application.
 CMD ["python", "final/app.py"]
