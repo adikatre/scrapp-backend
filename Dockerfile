@@ -9,15 +9,8 @@
 ARG PYTHON_VERSION=3.12.3
 FROM python:${PYTHON_VERSION}-slim as base
 
-# ---- Install Python deps (CPU-only torch) ----
-# Copy only requirements first to leverage Docker layer cache
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
-      torch==2.3.1+cpu torchvision==0.18.1+cpu \
-      --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir --no-deps ultralytics && \
-    pip install --no-cache-dir -r requirements.txt
+# Prevents Python from writing pyc files.
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # Keeps Python from buffering stdout and stderr to avoid situations where
 # the application crashes without emitting any logs due to buffering.
@@ -39,10 +32,6 @@ RUN adduser \
 
 # First, copy the requirements file into the container.
 COPY requirements.txt .
-
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install gunicorn
-RUN pip install --no-cache-dir --no-deps ultralytics
 
 # Download dependencies as a separate step to take advantage of Docker's caching.
 # Leverage a cache mount to /root/.cache/pip to speed up subsequent builds.
