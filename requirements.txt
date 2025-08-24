@@ -1,13 +1,5 @@
 flask
-twilio
-pandas
-ipykernel
-matplotlib
-kaggle
-tensorflow
-scikit-learn
 ultralytics
-opencv-python
+opencv-python-headless
 pillow
 flask-cors
-gunicorn
