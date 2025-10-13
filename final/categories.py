@@ -62,7 +62,7 @@ def build_coco_to_bin(model_names):
         elif name in e_waste:
             COCO_TO_BIN[name] = "E-Waste"
         elif name in bulky_items:
-            COCO_TO_BIN[name] = "Bulky Items"
+            COCO_TO_BIN[name] = "Bulky Items (Donate)"
         elif name in hazardous:
             COCO_TO_BIN[name] = "Hazardous Waste"
         elif name in single_use:
