@@ -10,7 +10,7 @@ from flask_cors import CORS
 from categories import build_coco_to_bin, default_route
 
 # Load YOLO model once at startup
-model = YOLO("yolov8n.pt")
+model = YOLO("yolov8x.pt")
 
 # Build class-to-bin mapping
 COCO_TO_BIN = build_coco_to_bin(model.names)
