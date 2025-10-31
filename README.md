@@ -1,7 +1,7 @@
-# Congressional-App-Challenge
+# Scrapp
 
-[Frontend](https://github.com/SlushEE0/Congressional-App-Challenge-Frontend)
-[Backend](https://github.com/adikatre/Congressional-App-Challenge-Backend)
+[Frontend](https://github.com/SlushEE0/scrapp)
+[Backend](https://github.com/adikatre/scrapp-backend)
 
 
 **OLD**
