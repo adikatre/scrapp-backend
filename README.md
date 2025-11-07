@@ -4,11 +4,11 @@
 [Backend](https://github.com/adikatre/scrapp-backend)
 
 ---
-To start the backend, run the following commands:
-`python -m venv venv`
-`pip install -r requirements.txt`
-`source venv/bin/activate`
-`python final/main.py`
+**To start the backend, run the following commands:** <br>
+`python -m venv venv`<br>
+`pip install -r requirements.txt`<br>
+`source venv/bin/activate`<br>
+`python final/app.py`
 ---
 
 **OLD**
