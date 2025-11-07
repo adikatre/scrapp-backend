@@ -3,6 +3,13 @@
 [Frontend](https://github.com/SlushEE0/scrapp)
 [Backend](https://github.com/adikatre/scrapp-backend)
 
+---
+To start the backend, run the following commands:
+`python -m venv venv`
+`pip install -r requirements.txt`
+`source venv/bin/activate`
+`python final/main.py`
+---
 
 **OLD**
 Next steps:
