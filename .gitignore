@@ -7,3 +7,6 @@ trash-yolo/datasets/taco_yolo/*
 trash-yolo/taco-trash-dataset/*
 
 *.pt
+
+taco_dataset/*
+taco_yolo_format/*
