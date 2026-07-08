@@ -3,10 +3,6 @@ venv/
 *venv*
 *.env
 *.Identifier
-trash-yolo/datasets/taco_yolo/*
-trash-yolo/taco-trash-dataset/*
 
+# Model weights (downloaded at runtime by ultralytics)
 *.pt
-
-taco_dataset/*
-taco_yolo_format/*
