@@ -6,3 +6,5 @@ venv/
 
 # Model weights (downloaded at runtime by ultralytics)
 *.pt
+
+.env

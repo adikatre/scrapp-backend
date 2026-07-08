@@ -5,9 +5,12 @@ import numpy as np
 import cv2
 import io
 from flask_cors import CORS
+from dotenv import load_dotenv
 
-# Import category mappings
 from categories import build_coco_to_bin, default_route
+from openai_classifier import classify_waste, classification_to_response_fields
+
+load_dotenv()
 
 # Load YOLO model once at startup
 model = YOLO("yolov8x.pt")
@@ -19,20 +22,7 @@ app = Flask(__name__)
 CORS(app)
 
 
-@app.route("/predict", methods=["POST"])
-def predict():
-    if "file" not in request.files:
-        return jsonify({"error": "No file field provided"}), 400
-
-    file = request.files["file"]
-
-    if file.filename == "":
-        return jsonify({"error": "Empty filename provided"}), 400
-
-    img_bytes = file.read()
-    pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
-
+def run_yolo_detection(img):
     results = model.predict([img], conf=0.30, verbose=False)
     r = results[0]
 
@@ -46,10 +36,8 @@ def predict():
         name = r.names[cls_id]
         route = COCO_TO_BIN.get(name, default_route)
 
-        # Aggregate per-bin count
         bin_totals[route] = bin_totals.get(route, 0) + 1
 
-        # Bounding box
         x1, y1, x2, y2 = map(float, b.xyxy[0])
 
         detections.append({
@@ -60,11 +48,42 @@ def predict():
         })
         objects.append(name)
 
-    return jsonify({
+    return objects, detections, bin_totals
+
+
+@app.route("/predict", methods=["POST"])
+def predict():
+    if "file" not in request.files:
+        return jsonify({"error": "No file field provided"}), 400
+
+    file = request.files["file"]
+
+    if file.filename == "":
+        return jsonify({"error": "Empty filename provided"}), 400
+
+    user_text = request.form.get("text", "").strip() or None
+
+    img_bytes = file.read()
+    pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+
+    objects, detections, bin_totals = run_yolo_detection(img)
+
+    classification = classify_waste(
+        pil_img=pil_img,
+        detections=detections,
+        user_text=user_text,
+    )
+    classifier_fields = classification_to_response_fields(classification)
+
+    response = {
         "objects": objects,
         "detections": detections,
-        "bin_totals": bin_totals
-    })
+        "bin_totals": bin_totals,
+        **classifier_fields,
+    }
+
+    return jsonify(response)
 
 
 if __name__ == "__main__":

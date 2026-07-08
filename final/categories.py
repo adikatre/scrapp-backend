@@ -1,10 +1,36 @@
 # categories.py
 
-# ♻️ Waste categories with COCO class names
+# Disposal route constants
+ROUTE_RECYCLE = "Recycle"
+ROUTE_COMPOST = "Compost"
+ROUTE_E_WASTE = "E-Waste"
+ROUTE_BULKY_ITEMS = "Bulky Items (Donate)"
+ROUTE_HAZARDOUS = "Hazardous Waste"
+ROUTE_SINGLE_USE = "Single-Use Items"
+ROUTE_CITY_INFRA = "City Infrastructure"
+ROUTE_LIVING_THINGS = "Living Things"
+ROUTE_GENERAL_TRASH = "General Trash"
+
+VALID_ROUTES = frozenset({
+    ROUTE_RECYCLE,
+    ROUTE_COMPOST,
+    ROUTE_E_WASTE,
+    ROUTE_BULKY_ITEMS,
+    ROUTE_HAZARDOUS,
+    ROUTE_SINGLE_USE,
+    ROUTE_CITY_INFRA,
+    ROUTE_LIVING_THINGS,
+    ROUTE_GENERAL_TRASH,
+})
+
+# Fallback route for anything uncategorized
+default_route = "Landfill / Donate / Check rules"
+
+# Waste categories with COCO class names
 
 recycle = {
     "bottle", "wine glass", "cup", "bowl",
-    "book", "clock", "vase"
+    "book", "vase"
 }
 
 compost = {
@@ -47,32 +73,36 @@ general_trash = {
     "donut", "cake", "scissors", "teddy bear"
 }
 
-# Fallback route for anything uncategorized
-default_route = "Landfill / Donate / Check rules"
+
+def normalize_route(route: str) -> str:
+    """Validate and normalize a disposal route string."""
+    if route in VALID_ROUTES:
+        return route
+    return default_route
 
 
 def build_coco_to_bin(model_names):
     """Map COCO class names to disposal bins."""
-    COCO_TO_BIN = {}
+    coco_to_bin = {}
     for _, name in model_names.items():
         if name in recycle:
-            COCO_TO_BIN[name] = "Recycle"
+            coco_to_bin[name] = ROUTE_RECYCLE
         elif name in compost:
-            COCO_TO_BIN[name] = "Compost"
+            coco_to_bin[name] = ROUTE_COMPOST
         elif name in e_waste:
-            COCO_TO_BIN[name] = "E-Waste"
+            coco_to_bin[name] = ROUTE_E_WASTE
         elif name in bulky_items:
-            COCO_TO_BIN[name] = "Bulky Items (Donate)"
+            coco_to_bin[name] = ROUTE_BULKY_ITEMS
         elif name in hazardous:
-            COCO_TO_BIN[name] = "Hazardous Waste"
+            coco_to_bin[name] = ROUTE_HAZARDOUS
         elif name in single_use:
-            COCO_TO_BIN[name] = "Single-Use Items"
+            coco_to_bin[name] = ROUTE_SINGLE_USE
         elif name in city_infra:
-            COCO_TO_BIN[name] = "City Infrastructure"
+            coco_to_bin[name] = ROUTE_CITY_INFRA
         elif name in living_things:
-            COCO_TO_BIN[name] = "Living Things"
+            coco_to_bin[name] = ROUTE_LIVING_THINGS
         elif name in general_trash:
-            COCO_TO_BIN[name] = "General Trash"
+            coco_to_bin[name] = ROUTE_GENERAL_TRASH
         else:
-            COCO_TO_BIN[name] = default_route
-    return COCO_TO_BIN
+            coco_to_bin[name] = default_route
+    return coco_to_bin

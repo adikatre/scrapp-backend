@@ -3,3 +3,6 @@ ultralytics
 opencv-python-headless
 pillow
 flask-cors
+openai
+python-dotenv
+pytest
