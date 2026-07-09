@@ -9,12 +9,15 @@ FINAL_DIR = Path(__file__).resolve().parents[1] / "final"
 sys.path.insert(0, str(FINAL_DIR))
 
 from categories import (  # noqa: E402
+    NON_WASTE_ROUTES,
     ROUTE_E_WASTE,
+    ROUTE_LIVING_THINGS,
     ROUTE_RECYCLE,
     VALID_ROUTES,
     build_coco_to_bin,
     default_route,
     e_waste,
+    is_non_waste_route,
     normalize_route,
     recycle,
 )
@@ -46,3 +49,9 @@ def test_normalize_route_accepts_valid_routes():
 
 def test_normalize_route_falls_back_for_unknown_route():
     assert normalize_route("Not A Real Route") == default_route
+
+
+def test_is_non_waste_route_identifies_living_things_and_city_infra():
+    assert is_non_waste_route(ROUTE_LIVING_THINGS) is True
+    assert is_non_waste_route(ROUTE_RECYCLE) is False
+    assert ROUTE_LIVING_THINGS in NON_WASTE_ROUTES

@@ -23,6 +23,12 @@ VALID_ROUTES = frozenset({
     ROUTE_GENERAL_TRASH,
 })
 
+# Routes that are not household waste and should be ignored for classification.
+NON_WASTE_ROUTES = frozenset({
+    ROUTE_LIVING_THINGS,
+    ROUTE_CITY_INFRA,
+})
+
 # Fallback route for anything uncategorized
 default_route = "Landfill / Donate / Check rules"
 
@@ -79,6 +85,11 @@ def normalize_route(route: str) -> str:
     if route in VALID_ROUTES:
         return route
     return default_route
+
+
+def is_non_waste_route(route: str) -> bool:
+    """Return True when a route represents people, animals, or city infrastructure."""
+    return route in NON_WASTE_ROUTES
 
 
 def build_coco_to_bin(model_names):

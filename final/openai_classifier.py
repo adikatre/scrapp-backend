@@ -14,16 +14,16 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from PIL import Image
 
-from categories import default_route, normalize_route
+from categories import default_route, is_non_waste_route, normalize_route
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "gpt-4o-mini"
-DEFAULT_IMAGE_DETAIL = "low"
+DEFAULT_IMAGE_DETAIL = "high"
 DEFAULT_TIMEOUT_SECONDS = 20
-DEFAULT_MAX_IMAGE_SIZE = 768
+DEFAULT_MAX_IMAGE_SIZE = 1280
 DEFAULT_JPEG_QUALITY = 85
 
 CLASSIFICATION_SCHEMA = {
@@ -67,12 +67,24 @@ Valid disposal routes (use exactly one of these strings):
 - Landfill / Donate / Check rules
 
 Rules:
+- Focus on the held or foreground waste item the user is showing, not people, furniture, or background scenery.
+- Do not classify people as waste. Ignore Living Things unless the user is clearly asking about an animal.
+- Small electronics accessories (USB cables, chargers, cords, earbuds, power adapters, HDMI cables) are E-Waste.
 - Be conservative for hazardous items; prefer "Hazardous Waste" or "Landfill / Donate / Check rules" when unsure.
 - Consider material (plastic, glass, metal, organic, electronic) when choosing routes.
 - If YOLO detections are provided, use them as hints but correct mistakes when the image shows something different.
 - Keep guidance concise (2-4 sentences) and practical for a household user.
 - confidence is 0.0 to 1.0 for your classification certainty.
 """
+
+PERSON_LIKE_NAMES = frozenset({
+    "person",
+    "human",
+    "man",
+    "woman",
+    "child",
+    "people",
+})
 
 
 @dataclass
@@ -116,6 +128,38 @@ def prepare_image_data_url(pil_img: Image.Image, config: ClassifierConfig) -> st
     return f"data:image/jpeg;base64,{encoded}"
 
 
+def _is_waste_item(item: dict[str, Any]) -> bool:
+    route = str(item.get("route", ""))
+    if is_non_waste_route(route):
+        return False
+
+    name = str(item.get("name", "")).strip().lower()
+    if name in PERSON_LIKE_NAMES:
+        return False
+
+    return True
+
+
+def _sort_items_by_relevance(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        items,
+        key=lambda item: (
+            0 if _is_waste_item(item) else 1,
+            -float(item.get("confidence", 0.0)),
+        ),
+    )
+
+
+def _waste_detections_for_hints(
+    detections: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [
+        detection
+        for detection in detections
+        if not is_non_waste_route(str(detection.get("route", "")))
+    ]
+
+
 def _build_user_content(
     image_data_url: str,
     detections: list[dict[str, Any]],
@@ -129,7 +173,7 @@ def _build_user_content(
             "route": d.get("route"),
             "bbox": d.get("bbox"),
         }
-        for d in detections
+        for d in _waste_detections_for_hints(detections)
     ]
 
     payload = {
@@ -177,14 +221,16 @@ def _parse_response_content(content: str) -> dict[str, Any]:
     guidance = str(parsed.get("guidance", "")).strip()
 
     return {
-        "items": normalized_items,
+        "items": _sort_items_by_relevance(normalized_items),
         "guidance": guidance,
     }
 
 
 def _fallback_result(detections: list[dict[str, Any]], reason: str) -> ClassificationResult:
+    waste_detections = _waste_detections_for_hints(detections)
+
     items = []
-    for detection in detections:
+    for detection in waste_detections:
         items.append({
             "name": detection.get("class_name", "unknown"),
             "material": "unknown",
