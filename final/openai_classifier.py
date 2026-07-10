@@ -39,8 +39,19 @@ CLASSIFICATION_SCHEMA = {
                     "route": {"type": "string"},
                     "confidence": {"type": "number"},
                     "caveats": {"type": "string"},
+                    "search_queries": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
                 },
-                "required": ["name", "material", "route", "confidence", "caveats"],
+                "required": [
+                    "name",
+                    "material",
+                    "route",
+                    "confidence",
+                    "caveats",
+                    "search_queries",
+                ],
                 "additionalProperties": False,
             },
         },
@@ -75,6 +86,13 @@ Rules:
 - If YOLO detections are provided, use them as hints but correct mistakes when the image shows something different.
 - Keep guidance concise (2-4 sentences) and practical for a household user.
 - confidence is 0.0 to 1.0 for your classification certainty.
+- search_queries: 2-4 short Google Places text-search queries that find real nearby drop-off
+  points for THIS specific item. Include the item-specific facility type (e.g. "battery
+  recycling drop-off") AND names of retail chains or public places known to accept it
+  (e.g. batteries -> "Ralphs", "Home Depot", "public library"; paint -> "Sherwin-Williams";
+  ink cartridges -> "Staples"; clothes -> "Goodwill donation center"). Do not include any
+  location or "near me" wording. Use an empty array for items handled curbside
+  (Recycle, Compost, Single-Use Items, General Trash) or non-waste routes.
 """
 
 PERSON_LIKE_NAMES = frozenset({
@@ -199,6 +217,19 @@ def _build_user_content(
     ]
 
 
+def _normalize_search_queries(raw: Any) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    queries = []
+    for entry in raw:
+        query = str(entry).strip()
+        if query:
+            queries.append(query[:60])
+        if len(queries) >= 4:
+            break
+    return queries
+
+
 def _parse_response_content(content: str) -> dict[str, Any]:
     parsed = json.loads(content)
 
@@ -216,6 +247,7 @@ def _parse_response_content(content: str) -> dict[str, Any]:
             "route": normalize_route(str(item.get("route", default_route))),
             "confidence": float(item.get("confidence", 0.5)),
             "caveats": str(item.get("caveats", "")),
+            "search_queries": _normalize_search_queries(item.get("search_queries")),
         })
 
     guidance = str(parsed.get("guidance", "")).strip()
@@ -237,6 +269,7 @@ def _fallback_result(detections: list[dict[str, Any]], reason: str) -> Classific
             "route": detection.get("route", default_route),
             "confidence": float(detection.get("confidence", 0.0)),
             "caveats": reason,
+            "search_queries": [],
         })
 
     if not items:
@@ -305,7 +338,7 @@ def classify_waste(
                 },
             },
             temperature=0.2,
-            max_tokens=500,
+            max_tokens=700,
         )
 
         content = response.choices[0].message.content
