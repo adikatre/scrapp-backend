@@ -1,5 +1,6 @@
+import os
+
 from flask import Flask, request, jsonify
-from ultralytics import YOLO
 from PIL import Image
 import numpy as np
 import cv2
@@ -12,11 +13,19 @@ from openai_classifier import classify_waste, classification_to_response_fields
 
 load_dotenv()
 
-# Load YOLO model once at startup
-model = YOLO("yolov8x.pt")
+USE_YOLO = os.getenv("USE_YOLO", "false").lower() in {"1", "true", "yes"}
 
-# Build class-to-bin mapping
-COCO_TO_BIN = build_coco_to_bin(model.names)
+model = None
+COCO_TO_BIN = {}
+
+if USE_YOLO:
+    from ultralytics import YOLO
+
+    # Load YOLO model once at startup
+    model = YOLO("yolov8x.pt")
+
+    # Build class-to-bin mapping
+    COCO_TO_BIN = build_coco_to_bin(model.names)
 
 app = Flask(__name__)
 CORS(app)
@@ -65,9 +74,12 @@ def predict():
 
     img_bytes = file.read()
     pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
-    objects, detections, bin_totals = run_yolo_detection(img)
+    if USE_YOLO:
+        img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        objects, detections, bin_totals = run_yolo_detection(img)
+    else:
+        objects, detections, bin_totals = [], [], {}
 
     classification = classify_waste(
         pil_img=pil_img,
