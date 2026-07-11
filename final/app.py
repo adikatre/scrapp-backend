@@ -2,8 +2,6 @@ import os
 
 from flask import Flask, request, jsonify
 from PIL import Image
-import numpy as np
-import cv2
 import io
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -19,6 +17,8 @@ model = None
 COCO_TO_BIN = {}
 
 if USE_YOLO:
+    import numpy as np
+    import cv2
     from ultralytics import YOLO
 
     # Load YOLO model once at startup
