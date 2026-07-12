@@ -15,9 +15,13 @@ sys.path.insert(0, str(FINAL_DIR))
 import app as flask_app  # noqa: E402
 from openai_classifier import ClassificationResult  # noqa: E402
 
+TEST_API_KEY = "test-secret-key-123"
+AUTH_HEADERS = {"Authorization": f"Bearer {TEST_API_KEY}"}
+
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
+    monkeypatch.setattr(flask_app, "BACKEND_API_KEY", TEST_API_KEY)
     flask_app.app.config["TESTING"] = True
     with flask_app.app.test_client() as test_client:
         yield test_client
@@ -73,6 +77,7 @@ def test_predict_success_with_openai_fields(mock_model, mock_classify, client, m
             "text": "Can I recycle this?",
         },
         content_type="multipart/form-data",
+        headers=AUTH_HEADERS,
     )
 
     assert response.status_code == 200
@@ -116,6 +121,7 @@ def test_predict_fallback_preserves_legacy_fields(mock_model, mock_classify, cli
         "/predict",
         data={"file": (_make_image_bytes(), "test.png")},
         content_type="multipart/form-data",
+        headers=AUTH_HEADERS,
     )
 
     assert response.status_code == 200
@@ -154,6 +160,7 @@ def test_predict_skips_yolo_when_disabled(mock_classify, client, monkeypatch):
             "text": "Can I recycle this?",
         },
         content_type="multipart/form-data",
+        headers=AUTH_HEADERS,
     )
 
     assert response.status_code == 200
@@ -171,6 +178,70 @@ def test_predict_skips_yolo_when_disabled(mock_classify, client, monkeypatch):
 
 
 def test_predict_missing_file_returns_400(client):
-    response = client.post("/predict", data={})
+    response = client.post("/predict", data={}, headers=AUTH_HEADERS)
     assert response.status_code == 400
     assert "error" in response.get_json()
+
+
+def test_predict_rejects_missing_api_key(client):
+    response = client.post(
+        "/predict",
+        data={"file": (_make_image_bytes(), "test.png")},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 401
+    assert "error" in response.get_json()
+
+
+def test_predict_rejects_wrong_api_key(client):
+    response = client.post(
+        "/predict",
+        data={"file": (_make_image_bytes(), "test.png")},
+        content_type="multipart/form-data",
+        headers={"Authorization": "Bearer wrong-key"},
+    )
+    assert response.status_code == 401
+    assert "error" in response.get_json()
+
+
+def test_predict_rejects_malformed_auth_header(client):
+    response = client.post(
+        "/predict",
+        data={"file": (_make_image_bytes(), "test.png")},
+        content_type="multipart/form-data",
+        headers={"Authorization": TEST_API_KEY},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "https://scrapp.app",
+        "https://www.scrapp.app",
+        "https://scrapp-sd.vercel.app",
+    ],
+)
+def test_cors_allows_configured_origins(client, origin):
+    response = client.options(
+        "/predict",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers.get("Access-Control-Allow-Origin") == origin
+
+
+def test_cors_rejects_unlisted_origin(client):
+    response = client.options(
+        "/predict",
+        headers={
+            "Origin": "https://evil.example",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+
+    assert response.headers.get("Access-Control-Allow-Origin") is None

@@ -1,3 +1,4 @@
+import hmac
 import os
 
 from flask import Flask, request, jsonify
@@ -28,7 +29,37 @@ if USE_YOLO:
     COCO_TO_BIN = build_coco_to_bin(model.names)
 
 app = Flask(__name__)
-CORS(app)
+
+CORS_ORIGINS = [
+    "https://scrapp.app",
+    "https://www.scrapp.app",
+    "https://scrapp-sd.vercel.app",
+]
+
+extra_origins = os.getenv("CORS_ORIGINS", "")
+if extra_origins:
+    CORS_ORIGINS.extend(origin.strip() for origin in extra_origins.split(",") if origin.strip())
+
+CORS(app, origins=CORS_ORIGINS)
+
+# Shared secret between the Vercel server (Next.js Server Action) and this
+# backend. The frontend never talks to us directly from the browser, so
+# Origin/CORS checks don't authenticate the caller -- this does.
+BACKEND_API_KEY = os.getenv("BACKEND_API_KEY", "")
+
+
+@app.before_request
+def enforce_api_key():
+    if request.method == "OPTIONS":
+        return None
+
+    auth_header = request.headers.get("Authorization", "")
+    provided_key = ""
+    if auth_header.startswith("Bearer "):
+        provided_key = auth_header[len("Bearer "):]
+
+    if not BACKEND_API_KEY or not hmac.compare_digest(provided_key, BACKEND_API_KEY):
+        return jsonify({"error": "Unauthorized"}), 401
 
 
 def run_yolo_detection(img):

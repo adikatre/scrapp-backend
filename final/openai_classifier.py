@@ -87,12 +87,16 @@ Rules:
 - Keep guidance concise (2-4 sentences) and practical for a household user.
 - confidence is 0.0 to 1.0 for your classification certainty.
 - search_queries: 2-4 short Google Places text-search queries that find real nearby drop-off
-  points for THIS specific item. Include the item-specific facility type (e.g. "battery
-  recycling drop-off") AND names of retail chains or public places known to accept it
-  (e.g. batteries -> "Ralphs", "Home Depot", "public library"; paint -> "Sherwin-Williams";
-  ink cartridges -> "Staples"; clothes -> "Goodwill donation center"). Do not include any
-  location or "near me" wording. Use an empty array for items handled curbside
-  (Recycle, Compost, Single-Use Items, General Trash) or non-waste routes.
+  points for THIS specific item and material — never generic category queries. Include the
+  item-specific facility type (e.g. "battery recycling drop-off", "glass bottle redemption
+  center", "food scrap compost drop-off") AND names of retail chains or public places known
+  to accept it (e.g. batteries -> "Ralphs", "Home Depot", "public library"; paint ->
+  "Sherwin-Williams"; ink cartridges -> "Staples"; clothes -> "Goodwill donation center";
+  plastic bags -> "grocery store plastic bag recycling"). Provide queries for every route
+  with a physical drop-off (Recycle, Compost, E-Waste, Hazardous Waste, Bulky Items
+  (Donate), Landfill / Donate / Check rules). Do not include any location or "near me"
+  wording. Use an empty array only for Single-Use Items, General Trash, City
+  Infrastructure, and Living Things.
 """
 
 PERSON_LIKE_NAMES = frozenset({
