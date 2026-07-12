@@ -14,7 +14,18 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from PIL import Image
 
-from categories import default_route, is_non_waste_route, normalize_route
+from categories import (
+    BIN_BLUE,
+    BIN_GRAY,
+    BIN_GREEN,
+    BIN_NONE,
+    BIN_SPECIAL,
+    ROUTE_TO_DEFAULT_BIN,
+    default_route,
+    is_non_waste_route,
+    normalize_bin,
+    normalize_route,
+)
 
 load_dotenv()
 
@@ -37,6 +48,16 @@ CLASSIFICATION_SCHEMA = {
                     "name": {"type": "string"},
                     "material": {"type": "string"},
                     "route": {"type": "string"},
+                    "bin": {
+                        "type": "string",
+                        "enum": [
+                            BIN_BLUE,
+                            BIN_GREEN,
+                            BIN_GRAY,
+                            BIN_SPECIAL,
+                            BIN_NONE,
+                        ],
+                    },
                     "confidence": {"type": "number"},
                     "caveats": {"type": "string"},
                     "search_queries": {
@@ -48,6 +69,7 @@ CLASSIFICATION_SCHEMA = {
                     "name",
                     "material",
                     "route",
+                    "bin",
                     "confidence",
                     "caveats",
                     "search_queries",
@@ -61,9 +83,9 @@ CLASSIFICATION_SCHEMA = {
     "additionalProperties": False,
 }
 
-SYSTEM_PROMPT = """You are a waste disposal expert helping users sort items correctly.
+SYSTEM_PROMPT = """You are a waste disposal expert for the City of San Diego, helping residents sort items correctly under City of San Diego (Environmental Services) rules.
 
-Given an image (and optional YOLO detections or user context), identify visible waste items and recommend disposal routes.
+Given an image (and optional YOLO detections or user context), identify visible waste items and recommend disposal routes plus the exact San Diego household bin.
 
 Valid disposal routes (use exactly one of these strings):
 - Recycle
@@ -77,14 +99,31 @@ Valid disposal routes (use exactly one of these strings):
 - General Trash
 - Landfill / Donate / Check rules
 
+Valid bins (use exactly one of these strings):
+- Blue Bin (Recycling)
+- Green Bin (Organics)
+- Gray Bin (Trash)
+- Special Drop-off
+- Not Applicable
+
+City of San Diego bin rules (official Curbside Recycling FAQ and "What Goes Where" guide):
+- Blue Bin (Recycling) — everything empty, dry, and loose (never bagged): aluminum/steel cans, aluminum foil and trays, glass bottles and jars, flattened cardboard, mixed paper, junk mail, paper gift wrap, shredded paper (in a closed paper bag), food/beverage paper cartons, and clean rigid plastics (bottles, jugs, jars, dairy tubs, clear PET clamshells, drink cups, deli trays, berry baskets, lids, plant pots, buckets, toys), plus clean, dry Styrofoam packaging — a San Diego quirk; most other cities' haulers refuse foam, and soiled foam still goes in the gray bin. Put metal and plastic lids back on their containers. Pizza boxes are OK if not heavily grease-soiled (tear off and recycle the clean top otherwise). Rinse plastic food containers clean; glass and cans just need to be emptied/scraped. NEVER in the blue bin: packing peanuts, plastic bags/wrap/film, plastic utensils, food or liquid residue, soiled paper, chemically treated paper (photographs, blueprints, sticky notes), metallic or plastic gift wrap, clothes/textiles/shoes, hoses, wires, electronics, batteries, CFL bulbs, "compostable" plastics, diapers, broken glass or dishware, aerosol cans that still contain product (empty ones go in the trash; ones with product are hazardous waste).
+- Green Bin (Organics) — ALL food scraps (fruit, vegetables, cooked meat, bones, dairy, eggshells, coffee grounds, loose tea leaves), food-soiled paper (paper towels, napkins, paper bags, parchment paper, paper coffee filters, newspaper used to wrap scraps), yard waste, small branches and untreated wood, hair/fur. Wrap scraps in paper, never plastic. NOT in the green bin: anything labeled "compostable" or "biodegradable" (bags, cups, utensils — they contaminate San Diego's compost and go in the Gray Bin), tea bags (plastic seals), any plastic, glass, metal, cartons, pet waste, kitty litter, diapers, cooking oil/grease, painted or treated wood, dirt/rocks.
+- Gray Bin (Trash) — hygiene products, diapers, pet waste, dishware and drinking glasses (non-container glass), paper plates/cups/takeout boxes, tissues, disposable wipes, plastic bags/wrappers/film, plastic straws and utensils, food-soiled Styrofoam, packing peanuts (or reuse: many shipping stores take clean peanuts back), and all "compostable"/"biodegradable"-labeled products. NEVER in any curbside bin: electronics, batteries, CFL/fluorescent bulbs, chemicals, hazardous waste.
+- Special Drop-off — hazardous waste (paint, motor oil, chemicals, propane, medications, needles), all batteries, bulbs, and electronics go to the Miramar Household Hazardous Waste Transfer Facility (5161 Convoy St.): free for City residents, appointment only via 858-694-7000 or Get It Done, Wed/Sat 9 a.m.-3 p.m., 50 lb max per trip. Bulky items (furniture, appliances, mattresses) need a service-provider pickup appointment. Clothes/shoes/textiles should be donated. Use this bin value whenever no curbside bin is legal.
+- Plastic bags and film go in the Gray Bin. Since California's SB 1053 (Jan. 1, 2026) banned plastic checkout bags, store take-back bins have largely disappeared — do not suggest returning bags to the supermarket as the primary option.
+
 Rules:
 - Focus on the held or foreground waste item the user is showing, not people, furniture, or background scenery.
 - Do not classify people as waste. Ignore Living Things unless the user is clearly asking about an animal.
-- Small electronics accessories (USB cables, chargers, cords, earbuds, power adapters, HDMI cables) are E-Waste.
+- Small electronics accessories (USB cables, chargers, cords, earbuds, power adapters, HDMI cables) are E-Waste with bin Special Drop-off.
 - Be conservative for hazardous items; prefer "Hazardous Waste" or "Landfill / Donate / Check rules" when unsure.
 - Consider material (plastic, glass, metal, organic, electronic) when choosing routes.
 - If YOLO detections are provided, use them as hints but correct mistakes when the image shows something different.
-- Keep guidance concise (2-4 sentences) and practical for a household user.
+- bin is the exact San Diego destination for the item. Use "Not Applicable" only for Living Things and City Infrastructure.
+- When a San Diego-specific quirk applies, cite it explicitly in caveats or guidance (e.g. "In San Diego, clean Styrofoam packaging goes in the blue bin", "plastic bags never go in the blue bin — gray bin only", "put lids back on containers before recycling", "batteries are illegal in all San Diego curbside bins — Miramar HHW facility by appointment, 858-694-7000").
+- Recyclables must be empty, dry, and loose; put prep steps (rinse, dry, flatten, cap off, closed paper bag) in caveats.
+- Keep guidance concise (2-4 sentences), practical for a San Diego household user, and name the bin color.
 - confidence is 0.0 to 1.0 for your classification certainty.
 - search_queries: 2-4 short Google Places text-search queries that find real nearby drop-off
   points for THIS specific item and material — never generic category queries. Include the
@@ -245,10 +284,12 @@ def _parse_response_content(content: str) -> dict[str, Any]:
     for item in items:
         if not isinstance(item, dict):
             continue
+        route = normalize_route(str(item.get("route", default_route)))
         normalized_items.append({
             "name": str(item.get("name", "unknown item")),
             "material": str(item.get("material", "unknown")),
-            "route": normalize_route(str(item.get("route", default_route))),
+            "route": route,
+            "bin": normalize_bin(str(item.get("bin", "")), route),
             "confidence": float(item.get("confidence", 0.5)),
             "caveats": str(item.get("caveats", "")),
             "search_queries": _normalize_search_queries(item.get("search_queries")),
@@ -267,10 +308,12 @@ def _fallback_result(detections: list[dict[str, Any]], reason: str) -> Classific
 
     items = []
     for detection in waste_detections:
+        route = detection.get("route", default_route)
         items.append({
             "name": detection.get("class_name", "unknown"),
             "material": "unknown",
-            "route": detection.get("route", default_route),
+            "route": route,
+            "bin": ROUTE_TO_DEFAULT_BIN.get(route, BIN_SPECIAL),
             "confidence": float(detection.get("confidence", 0.0)),
             "caveats": reason,
             "search_queries": [],
@@ -351,9 +394,10 @@ def classify_waste(
 
         parsed = _parse_response_content(content)
 
-        # Ensure routes remain valid even if model drifts outside schema constraints.
+        # Ensure routes and bins remain valid even if model drifts outside schema constraints.
         for item in parsed["items"]:
             item["route"] = normalize_route(item["route"])
+            item["bin"] = normalize_bin(item.get("bin", ""), item["route"])
 
         return ClassificationResult(
             items=parsed["items"],

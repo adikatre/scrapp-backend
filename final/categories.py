@@ -32,6 +32,37 @@ NON_WASTE_ROUTES = frozenset({
 # Fallback route for anything uncategorized
 default_route = "Landfill / Donate / Check rules"
 
+# City of San Diego household bin destinations. Trash bins are gray as of
+# July 1, 2026 — the City no longer collects from the old black bins.
+BIN_BLUE = "Blue Bin (Recycling)"
+BIN_GREEN = "Green Bin (Organics)"
+BIN_GRAY = "Gray Bin (Trash)"
+BIN_SPECIAL = "Special Drop-off"
+BIN_NONE = "Not Applicable"
+
+VALID_BINS = frozenset({
+    BIN_BLUE,
+    BIN_GREEN,
+    BIN_GRAY,
+    BIN_SPECIAL,
+    BIN_NONE,
+})
+
+# Default San Diego curbside bin for each disposal route, used when the
+# classifier omits or invents a bin and for YOLO-only fallback items.
+ROUTE_TO_DEFAULT_BIN = {
+    ROUTE_RECYCLE: BIN_BLUE,
+    ROUTE_COMPOST: BIN_GREEN,
+    ROUTE_GENERAL_TRASH: BIN_GRAY,
+    ROUTE_SINGLE_USE: BIN_GRAY,
+    ROUTE_E_WASTE: BIN_SPECIAL,
+    ROUTE_HAZARDOUS: BIN_SPECIAL,
+    ROUTE_BULKY_ITEMS: BIN_SPECIAL,
+    ROUTE_CITY_INFRA: BIN_NONE,
+    ROUTE_LIVING_THINGS: BIN_NONE,
+    default_route: BIN_SPECIAL,
+}
+
 # Waste categories with COCO class names
 
 recycle = {
@@ -85,6 +116,13 @@ def normalize_route(route: str) -> str:
     if route in VALID_ROUTES:
         return route
     return default_route
+
+
+def normalize_bin(bin_str: str, route: str) -> str:
+    """Validate a bin string, falling back to the route's default San Diego bin."""
+    if bin_str in VALID_BINS:
+        return bin_str
+    return ROUTE_TO_DEFAULT_BIN.get(route, BIN_SPECIAL)
 
 
 def is_non_waste_route(route: str) -> bool:

@@ -9,15 +9,26 @@ FINAL_DIR = Path(__file__).resolve().parents[1] / "final"
 sys.path.insert(0, str(FINAL_DIR))
 
 from categories import (  # noqa: E402
+    BIN_BLUE,
+    BIN_GRAY,
+    BIN_GREEN,
+    BIN_NONE,
+    BIN_SPECIAL,
     NON_WASTE_ROUTES,
+    ROUTE_COMPOST,
     ROUTE_E_WASTE,
+    ROUTE_GENERAL_TRASH,
+    ROUTE_HAZARDOUS,
     ROUTE_LIVING_THINGS,
     ROUTE_RECYCLE,
+    ROUTE_TO_DEFAULT_BIN,
+    VALID_BINS,
     VALID_ROUTES,
     build_coco_to_bin,
     default_route,
     e_waste,
     is_non_waste_route,
+    normalize_bin,
     normalize_route,
     recycle,
 )
@@ -55,3 +66,26 @@ def test_is_non_waste_route_identifies_living_things_and_city_infra():
     assert is_non_waste_route(ROUTE_LIVING_THINGS) is True
     assert is_non_waste_route(ROUTE_RECYCLE) is False
     assert ROUTE_LIVING_THINGS in NON_WASTE_ROUTES
+
+
+def test_normalize_bin_accepts_valid_bins():
+    for bin_str in VALID_BINS:
+        assert normalize_bin(bin_str, ROUTE_RECYCLE) == bin_str
+
+
+def test_normalize_bin_falls_back_to_route_default():
+    assert normalize_bin("", ROUTE_RECYCLE) == BIN_BLUE
+    assert normalize_bin("Purple Bin", ROUTE_COMPOST) == BIN_GREEN
+    assert normalize_bin("", ROUTE_GENERAL_TRASH) == BIN_GRAY
+    assert normalize_bin("", ROUTE_HAZARDOUS) == BIN_SPECIAL
+    assert normalize_bin("", ROUTE_LIVING_THINGS) == BIN_NONE
+
+
+def test_normalize_bin_unknown_route_defaults_to_special():
+    assert normalize_bin("", "Not A Real Route") == BIN_SPECIAL
+
+
+def test_every_route_has_a_default_bin():
+    for route in VALID_ROUTES:
+        assert route in ROUTE_TO_DEFAULT_BIN
+    assert default_route in ROUTE_TO_DEFAULT_BIN
