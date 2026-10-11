@@ -149,5 +149,5 @@ To localize disposal rules, edit the system prompt in `openai_classifier.py` wit
 
 ## Made By
 
-- Frontend: [SlushEE0](https://github.com/slushee0), [repo](https://github.com/adikatre/scrapp)
-- Backend & AI: [adikatre](https://github.com/adikatre), [repo](https://github.com/adikatre/scrapp-backend)
+- [SlushEE0](https://github.com/slushee0), [repo](https://github.com/adikatre/scrapp)
+- [adikatre](https://github.com/adikatre), [repo](https://github.com/adikatre/scrapp-backend)
