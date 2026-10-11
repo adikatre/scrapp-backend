@@ -139,6 +139,8 @@ CORS is enabled for `https://scrapp.app`, `https://www.scrapp.app`, and `https:/
 
 ## Classifier Details
 
+### GPT-4o-mini vision
+
 - **Implementation:** [final/openai_classifier.py](final/openai_classifier.py)
 - **Model:** `gpt-4o-mini` with structured JSON output
 - **Image handling:** Resized to max 1280px, JPEG quality 85, `detail: high` (all tunable, see the `OPENAI_*` variables above)
@@ -146,6 +148,25 @@ CORS is enabled for `https://scrapp.app`, `https://www.scrapp.app`, and `https:/
 - **Fallback:** If the API key is missing, the call times out, or `OPENAI_ENABLED=false`, the classifier returns a heuristic result with `"fallback_used": true` and `"model": "fallback"` instead of failing the request
 
 To localize disposal rules, edit the system prompt in `openai_classifier.py` with your city or county's actual recycling guidelines.
+
+### YOLOv8 detection and disposal mapping
+
+The optional YOLO path identifies individual objects in a photo and maps their labels to disposal routes. The current implementation loads the pretrained **YOLOv8x** detector (`yolov8x.pt`); the waste-specific behavior comes from hand-written category mappings, rather than fine-tuned model weights. This repository does not include a custom waste checkpoint or a fine-tuning pipeline.
+
+- **Implementation:** [final/app.py](final/app.py), with class-to-route rules in [final/categories.py](final/categories.py)
+- **Detection:** The model loads once at startup. Each uploaded image is converted to OpenCV's BGR format and passed to YOLO with a confidence threshold of `0.30`. Each detection includes a class name, confidence score, and bounding box in image pixel coordinates.
+- **Disposal mapping:** COCO object labels are mapped to routes such as Recycle (`bottle`), Compost (`banana`), and E-Waste (`laptop`). Unmapped labels use `Landfill / Donate / Check rules`. These rules use object labels, so they cannot reliably distinguish materials, contamination, or local recycling exceptions.
+- **Response:** `objects` lists detected labels, `detections` includes boxes and suggested routes, and `bin_totals` counts detections per route.
+- **Working with GPT-4o-mini:** Waste detections are supplied as hints alongside the image and optional user note. People, animals, and city infrastructure are excluded from those hints. GPT-4o-mini can correct the detections and provide more specific disposal guidance. If OpenAI is disabled or unavailable, the same waste detections provide the fallback items and default San Diego bin assignments; without detections, the fallback asks for a clearer photo or a local-rules check.
+
+To enable YOLO locally, install the additional dependencies and set the flag before starting the backend:
+
+```bash
+pip install ultralytics opencv-python-headless numpy
+USE_YOLO=true python final/app.py
+```
+
+YOLO is off by default and is not used in the current production configuration because of its additional memory requirements.
 
 ## Made By
 
