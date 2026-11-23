@@ -212,7 +212,7 @@ def test_predict_adaption_uses_submitted_inputs(client, monkeypatch, with_photo,
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["classifier"] == {
-        "model": "gemma-4-26b-a4b-it", "source": "adaption", "basis": basis, "fallback_used": False,
+        "model": "qwen3.5-397b", "source": "adaption", "basis": basis, "fallback_used": False,
     }
     assert payload["items"][0]["bin"] == "Special Drop-off"
     assert payload["text"] == "Keep the battery out of city carts."

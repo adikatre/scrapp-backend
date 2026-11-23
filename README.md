@@ -41,7 +41,7 @@ Set the identical value on the backend host and in the frontend's environment.
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `ADAPTION_API_KEY` | For Adaption | — | Key for the hosted Responses API. Takes priority when both provider keys are set |
-| `ADAPTION_MODEL` | No | `gemma-4-26b-a4b-it` | Hosted model with image input support |
+| `ADAPTION_MODEL` | No | `qwen3.5-397b` | Hosted model with image input support |
 | `ADAPTION_TIMEOUT_SECONDS` | No | `20` | Adaption request timeout |
 | `ADAPTION_ENABLED` | No | `true` | Set to false to exercise the fallback on an Adaption installation |
 | `OPENAI_API_KEY` | For OpenAI only | — | Alternative provider when the Adaption key is absent |
@@ -99,7 +99,7 @@ Classify a waste item from an image, an item description, or both. Provide at le
   ],
   "text": "Place the empty, dry yogurt cup loose in your blue recycling cart.",
   "classifier": {
-    "model": "gemma-4-26b-a4b-it",
+    "model": "qwen3.5-397b",
     "source": "adaption",
     "basis": "image",
     "fallback_used": false
@@ -151,7 +151,7 @@ CORS is enabled for `https://scrapp.app`, `https://www.scrapp.app`, and `https:/
 
 ### Image and description classification
 
-[The classifier](final/openai_classifier.py) sends one provider request per scan. Adaption receives a message at `POST https://api.prod.adaptionlabs.ai/api/v1/responses`. A photo is a resized JPEG data URL in an `input_image` part. The optional note and YOLO hints are sent as text. The request sets `store: false`, uses no tools and caps output at 900 tokens. The default Gemma model supports both text and image input. See the [referenced endpoint guide](https://github.com/anyhows/SwarmAlignment26/blob/main/docs/adaption-llm-endpoints.md), [Adaption image input reference](https://docs.adaptionlabs.ai/inference-stacks/generate-a-model-response/) and [hosted model list](https://docs.adaptionlabs.ai/inference-stacks/models/).
+[The classifier](final/openai_classifier.py) sends one provider request per scan. Adaption receives a message at `POST https://api.prod.adaptionlabs.ai/api/v1/responses`. A photo is a resized JPEG data URL in an `input_image` part. The optional note and YOLO hints are sent as text. The request sets `store: false`, uses no tools and caps output at 900 tokens. The default Qwen 3.5 model supports both text and image input. See the [referenced endpoint guide](https://github.com/anyhows/SwarmAlignment26/blob/main/docs/adaption-llm-endpoints.md), [Adaption image input reference](https://docs.adaptionlabs.ai/inference-stacks/generate-a-model-response/) and [hosted model list](https://docs.adaptionlabs.ai/inference-stacks/models/).
 
 OpenAI-only installations use Chat Completions with a JSON schema. Both providers share the same item validation, route and bin vocabulary, camera orientation correction, image resizing and response fields. The client never receives provider keys. Provider errors use the existing detection fallback, with no automatic retries or second paid provider call.
 

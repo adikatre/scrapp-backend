@@ -34,7 +34,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "gpt-4o-mini"
-ADAPTION_DEFAULT_MODEL = "gemma-4-26b-a4b-it"
+ADAPTION_DEFAULT_MODEL = "qwen3.5-397b"
 ADAPTION_RESPONSES_URL = "https://api.prod.adaptionlabs.ai/api/v1/responses"
 DEFAULT_IMAGE_DETAIL = "high"
 DEFAULT_TIMEOUT_SECONDS = 20
