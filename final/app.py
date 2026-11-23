@@ -2,8 +2,7 @@ import hmac
 import os
 
 from flask import Flask, request, jsonify
-from PIL import Image
-import io
+from PIL import Image, ImageOps
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -18,8 +17,6 @@ model = None
 COCO_TO_BIN = {}
 
 if USE_YOLO:
-    import numpy as np
-    import cv2
     from ultralytics import YOLO
 
     # Load YOLO model once at startup
@@ -29,6 +26,8 @@ if USE_YOLO:
     COCO_TO_BIN = build_coco_to_bin(model.names)
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024
+MAX_IMAGE_PIXELS = 32_000_000
 
 CORS_ORIGINS = [
     "https://scrapp.app",
@@ -62,6 +61,11 @@ def enforce_api_key():
         return jsonify({"error": "Unauthorized"}), 401
 
 
+@app.errorhandler(413)
+def request_too_large(_error):
+    return jsonify({"error": "Use a smaller upload. The request limit is 12 MiB."}), 413
+
+
 def run_yolo_detection(img):
     results = model.predict([img], conf=0.30, verbose=False)
     r = results[0]
@@ -93,22 +97,27 @@ def run_yolo_detection(img):
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    if "file" not in request.files:
-        return jsonify({"error": "No file field provided"}), 400
-
-    file = request.files["file"]
-
-    if file.filename == "":
-        return jsonify({"error": "Empty filename provided"}), 400
-
     user_text = request.form.get("text", "").strip() or None
+    file = request.files.get("file")
+    if user_text and len(user_text) > 1000:
+        return jsonify({"error": "Use 1,000 characters or fewer for the item description."}), 400
+    if not file and not user_text:
+        return jsonify({"error": "Add a photo or describe the item."}), 400
 
-    img_bytes = file.read()
-    pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    pil_img = None
+    if file:
+        try:
+            with Image.open(file.stream) as image:
+                if image.width * image.height > MAX_IMAGE_PIXELS:
+                    return jsonify({"error": "Use a photo of 32 megapixels or less."}), 413
+                pil_img = ImageOps.exif_transpose(image).convert("RGB")
+        except Image.DecompressionBombError:
+            return jsonify({"error": "Use a smaller photo."}), 413
+        except (OSError, ValueError, SyntaxError):
+            return jsonify({"error": "Could not read this photo. Try a JPEG, PNG or WebP image."}), 400
 
-    if USE_YOLO:
-        img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
-        objects, detections, bin_totals = run_yolo_detection(img)
+    if USE_YOLO and pil_img is not None:
+        objects, detections, bin_totals = run_yolo_detection(pil_img)
     else:
         objects, detections, bin_totals = [], [], {}
 
