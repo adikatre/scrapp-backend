@@ -165,13 +165,10 @@ def test_system_prompt_contains_san_diego_rules():
     assert "Blue Bin (Recycling)" in SYSTEM_PROMPT
     assert "Green Bin (Organics)" in SYSTEM_PROMPT
     assert "Gray Bin (Trash)" in SYSTEM_PROMPT
-    # SD quirks per the current What Goes Where guide: clean foam accepted in the
-    # blue bin, plastic bags/film never, batteries to Miramar HHW.
-    assert "Styrofoam packaging goes in the blue bin" in SYSTEM_PROMPT
-    assert "NEVER in the blue bin: packing peanuts" in SYSTEM_PROMPT
+    assert "clean Styrofoam packaging" in SYSTEM_PROMPT
+    assert "Exclude packing peanuts" in SYSTEM_PROMPT
     assert "plastic bags" in SYSTEM_PROMPT.lower()
-    assert "Miramar" in SYSTEM_PROMPT
-    assert "858-694-7000" in SYSTEM_PROMPT
+    assert "All batteries and propane cylinders stay out of curbside carts" in SYSTEM_PROMPT
 
 
 def test_fallback_result_ignores_person_only_detections():
@@ -187,7 +184,9 @@ def test_fallback_result_ignores_person_only_detections():
     result = _fallback_result(detections, "OpenAI classifier disabled")
 
     assert result.items == []
-    assert "No items were confidently detected" in result.guidance
+    assert result.source == "none"
+    assert result.basis == "none"
+    assert "service is unavailable" in result.guidance
 
 
 def test_fallback_result_assigns_route_default_bin(sample_detections):

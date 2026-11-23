@@ -183,6 +183,112 @@ def test_predict_missing_file_returns_400(client):
     assert "error" in response.get_json()
 
 
+@pytest.mark.parametrize(
+    ("with_photo", "note", "basis"),
+    [(True, "", "image"), (False, "Used AA battery", "note"), (True, "It's an AA", "image_and_note")],
+)
+def test_predict_adaption_uses_submitted_inputs(client, monkeypatch, with_photo, note, basis):
+    monkeypatch.setenv("ADAPTION_API_KEY", "test-adaption-key")
+    monkeypatch.setenv("ADAPTION_ENABLED", "true")
+    monkeypatch.delenv("ADAPTION_MODEL", raising=False)
+    monkeypatch.setattr(flask_app, "USE_YOLO", False)
+    result_text = json.dumps({
+        "items": [{"name": "AA battery", "route": "Hazardous Waste", "bin": "Blue Bin (Recycling)"}],
+        "guidance": "Keep the battery out of city carts.",
+    })
+    data = {"text": note}
+    if with_photo:
+        data["file"] = (_make_image_bytes(), "item.png")
+    with patch("openai_classifier.httpx.post") as post:
+        post.return_value.json.return_value = {
+            "status": "completed",
+            "output": [{
+                "type": "message", "role": "assistant",
+                "content": [{"type": "output_text", "text": result_text}],
+            }],
+        }
+        response = client.post("/predict", data=data, content_type="multipart/form-data", headers=AUTH_HEADERS)
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["classifier"] == {
+        "model": "gemma-4-26b-a4b-it", "source": "adaption", "basis": basis, "fallback_used": False,
+    }
+    assert payload["items"][0]["bin"] == "Special Drop-off"
+    assert payload["text"] == "Keep the battery out of city carts."
+    post.assert_called_once()
+    assert post.call_args.args[0] == "https://api.prod.adaptionlabs.ai/api/v1/responses"
+    options = post.call_args.kwargs
+    assert options["headers"]["Authorization"] == "Bearer test-adaption-key"
+    assert options["json"]["store"] is False
+    parts = options["json"]["input"][0]["content"]
+    assert parts[0]["type"] == "input_text"
+    assert note in parts[0]["text"]
+    if with_photo:
+        assert parts[1]["type"] == "input_image"
+        assert parts[1]["image_url"].startswith("data:image/jpeg;base64,")
+    else:
+        assert len(parts) == 1
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"status": "incomplete", "output_text": "{}"},
+        {"status": "completed", "output_text": "not JSON"},
+        {"output_text": '{"items": {}, "guidance": "bogus"}'},
+        {"output_text": '{"items": [{"name":"jar","confidence":NaN}],"guidance":"test"}'},
+        {"output": []},
+    ],
+)
+def test_unusable_adaption_response_has_no_fabricated_item(client, monkeypatch, body):
+    monkeypatch.setenv("ADAPTION_API_KEY", "test-adaption-key")
+    monkeypatch.setenv("ADAPTION_ENABLED", "true")
+    with patch("openai_classifier.httpx.post") as post:
+        post.return_value.json.return_value = body
+        response = client.post("/predict", data={"text": "mystery item"}, headers=AUTH_HEADERS)
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["items"] == []
+    assert payload["classifier"]["fallback_used"]
+    assert payload["classifier"]["basis"] == "none"
+    post.assert_called_once()
+
+
+@patch("app.classify_waste")
+def test_invalid_inputs_do_not_reach_provider(classify, client):
+    requests = [
+        {"file": (io.BytesIO(b"not an image"), "image.jpg")},
+        {"text": "   "},
+        {"text": "x" * 1001},
+    ]
+    for data in requests:
+        response = client.post("/predict", data=data, headers=AUTH_HEADERS)
+        assert response.status_code == 400
+        assert response.get_json()["error"]
+    classify.assert_not_called()
+
+
+@patch("app.classify_waste")
+def test_predict_rejects_oversized_photo_before_classification(classify, client, monkeypatch):
+    monkeypatch.setattr(flask_app, "MAX_IMAGE_PIXELS", 100)
+    response = client.post("/predict", data={"file": (_make_image_bytes(), "test.png")}, headers=AUTH_HEADERS)
+    assert response.status_code == 413
+    assert response.get_json()["error"]
+    classify.assert_not_called()
+
+
+def test_predict_redacts_provider_failure(client, monkeypatch, caplog):
+    monkeypatch.setenv("ADAPTION_API_KEY", "fake-key")
+    monkeypatch.setenv("ADAPTION_ENABLED", "true")
+    with patch("openai_classifier.httpx.post", side_effect=TimeoutError("private-request-content")) as post:
+        response = client.post("/predict", data={"text": "item description"}, headers=AUTH_HEADERS)
+    assert response.get_json()["classifier"]["fallback_used"]
+    assert "private-request-content" not in caplog.text
+    assert "private-request-content" not in response.get_data(as_text=True)
+    post.assert_called_once()
+
+
 def test_predict_rejects_missing_api_key(client):
     response = client.post(
         "/predict",

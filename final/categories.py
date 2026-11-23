@@ -120,9 +120,12 @@ def normalize_route(route: str) -> str:
 
 def normalize_bin(bin_str: str, route: str) -> str:
     """Validate a bin string, falling back to the route's default San Diego bin."""
+    default_bin = ROUTE_TO_DEFAULT_BIN.get(route, BIN_SPECIAL)
+    if default_bin in {BIN_SPECIAL, BIN_NONE}:
+        return default_bin
     if bin_str in VALID_BINS:
         return bin_str
-    return ROUTE_TO_DEFAULT_BIN.get(route, BIN_SPECIAL)
+    return default_bin
 
 
 def is_non_waste_route(route: str) -> bool:

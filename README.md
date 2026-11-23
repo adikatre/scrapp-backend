@@ -1,13 +1,13 @@
 # Scrapp Backend
 
-Flask API that powers [Scrapp](https://github.com/adikatre/scrapp) waste classification. Accepts an image (and optional text note), runs GPT-4o-mini vision, and returns structured disposal guidance.
+Flask API that powers [Scrapp](https://github.com/adikatre/scrapp) waste classification. Accepts a photo, a written item description, or both. A vision model identifies the item and returns preparation steps and a disposal route for City of San Diego households.
 
 **Frontend:** [github.com/adikatre/scrapp](https://github.com/adikatre/scrapp)
 
 ## Overview
 
-- `POST /predict`, classify a waste item from a photo
-- **Primary classifier:** GPT-4o-mini vision ([openai_classifier.py](final/openai_classifier.py)), structured JSON with item name, material, disposal route, confidence, caveats, and Places search queries
+- `POST /predict` returns item names, materials, disposal routes, bins, confidence estimates, caveats and search terms.
+- The server selects Adaption when `ADAPTION_API_KEY` is present. Existing OpenAI-only deployments continue to use GPT-4o-mini.
 - **Optional:** YOLOv8 object detection behind `USE_YOLO=true` (off by default; requires extra dependencies and ~2–4 GB RAM; not used in production)
 - **Auth:** every request needs `Authorization: Bearer $BACKEND_API_KEY` (see [Authentication](#authentication))
 
@@ -17,7 +17,8 @@ Flask API that powers [Scrapp](https://github.com/adikatre/scrapp) waste classif
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env       # fill in OPENAI_API_KEY and BACKEND_API_KEY
+cp -n .env.example .env    # preserves existing keys
+# Set ADAPTION_API_KEY and BACKEND_API_KEY in .env
 python final/app.py        # listens on :5000
 ```
 
@@ -25,7 +26,7 @@ The frontend expects the backend at `http://localhost:5000` by default, and must
 
 ## Authentication
 
-The browser never calls this API directly; the Next.js server action does. So CORS and `Origin` checks don't authenticate anything, a shared secret does. A `before_request` hook ([app.py](final/app.py)) rejects any request whose `Authorization: Bearer <key>` doesn't match `BACKEND_API_KEY` (constant-time compare), including when the variable is unset, so an unconfigured server refuses everything rather than serving your OpenAI quota to the internet. `OPTIONS` preflights are exempt.
+The browser never calls this API directly; the Next.js server action does. So CORS and `Origin` checks don't authenticate anything, a shared secret does. A `before_request` hook ([app.py](final/app.py)) rejects any request whose `Authorization: Bearer <key>` doesn't match `BACKEND_API_KEY` (constant-time compare), including when the variable is unset, so an unconfigured server refuses everything rather than using a provider's quota for unauthenticated scans. `OPTIONS` preflights are exempt.
 
 Generate a key with:
 
@@ -39,7 +40,11 @@ Set the identical value on the backend host and in the frontend's environment.
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `OPENAI_API_KEY` | Yes |, | GPT-4o-mini vision API calls |
+| `ADAPTION_API_KEY` | For Adaption | — | Key for the hosted Responses API. Takes priority when both provider keys are set |
+| `ADAPTION_MODEL` | No | `gemma-4-26b-a4b-it` | Hosted model with image input support |
+| `ADAPTION_TIMEOUT_SECONDS` | No | `20` | Adaption request timeout |
+| `ADAPTION_ENABLED` | No | `true` | Set to false to exercise the fallback on an Adaption installation |
+| `OPENAI_API_KEY` | For OpenAI only | — | Alternative provider when the Adaption key is absent |
 | `BACKEND_API_KEY` | Yes |, | Shared bearer secret the frontend must send; unset means every request `401`s |
 | `USE_YOLO` | No | `false` | Enable YOLOv8 detection (needs `ultralytics`, `opencv-python-headless`, and significant RAM) |
 | `CORS_ORIGINS` | No |, | Comma-separated extra allowed origins, added to the production defaults below |
@@ -55,16 +60,16 @@ See [.env.example](.env.example) for a template.
 ## Tests
 
 ```bash
-USE_YOLO=true python -m pytest
+USE_YOLO=false python -m pytest
 ```
 
-`USE_YOLO=true` is required for the **full** suite: `app.py` imports `cv2`/`numpy` only when the flag is on at import time, so the two YOLO integration tests raise `NameError` without it (30 pass, 2 fail). It also means those two tests need `ultralytics` and `opencv-python-headless` installed, neither is in [requirements.txt](requirements.txt), since production doesn't run YOLO. Plain `python -m pytest` exercises everything else, including the OpenAI classifier and category mapping, against mocks, no API key needed.
+The suite exercises photo-only, text-only and combined requests, optional YOLO behavior, provider failures, input validation and bearer authentication. It uses mocked providers and requires no live API credentials or model weights.
 
 ## API Reference
 
 ### `POST /predict`
 
-Classify a waste item from an image.
+Classify a waste item from an image, an item description, or both. Provide at least one of the following fields.
 
 **Request:** `multipart/form-data`
 
@@ -74,8 +79,8 @@ Classify a waste item from an image.
 
 | Field | Required | Description |
 |---|---|---|
-| `file` | Yes | Image file (JPEG, PNG, etc.) |
-| `text` | No | Optional user context note |
+| `file` | If text is empty | Decodable photo such as JPEG, PNG or WebP, up to 32 megapixels. Total request limit is 12 MiB |
+| `text` | If file is absent | Item description or context note, up to 1,000 characters after trimming |
 
 **Response:** `200 OK`, JSON body:
 
@@ -84,17 +89,19 @@ Classify a waste item from an image.
   "items": [
     {
       "name": "Plastic yogurt cup",
-      "material": "#5 polypropylene",
+      "material": "rigid plastic",
       "route": "Recycle",
+      "bin": "Blue Bin (Recycling)",
       "confidence": 0.9,
-      "caveats": "Rinse before recycling; check local #5 acceptance",
-      "search_queries": ["plastic recycling center", "yogurt container recycling"]
+      "caveats": "Empty and dry the container first.",
+      "search_queries": []
     }
   ],
-  "text": "This appears to be a #5 plastic yogurt cup. Rinse it and check whether your curbside program accepts #5 plastics.",
+  "text": "Place the empty, dry yogurt cup loose in your blue recycling cart.",
   "classifier": {
-    "model": "gpt-4o-mini",
-    "source": "openai",
+    "model": "gemma-4-26b-a4b-it",
+    "source": "adaption",
+    "basis": "image",
     "fallback_used": false
   },
   "objects": [],
@@ -105,6 +112,8 @@ Classify a waste item from an image.
 
 `objects`, `detections`, and `bin_totals` are populated only when `USE_YOLO=true`. The response shape matches the frontend's [`PredictionResult`](https://github.com/adikatre/scrapp/blob/main/src/lib/types.ts) type.
 
+`classifier.basis` records what informed the result. Model results use `image`, `note` or `image_and_note`. A provider outage or invalid model response sets `fallback_used` to true. Available YOLO labels then use `detections`. An empty fallback returns no items and uses `source: "none"` and `basis: "none"`. Successful model responses may also have an empty item list, with guidance asking for more information.
+
 **Valid disposal routes:** Recycle, Compost, E-Waste, Bulky Items (Donate), Hazardous Waste, Single-Use Items, City Infrastructure, Living Things, General Trash, Landfill / Donate / Check rules
 
 **Errors:**
@@ -112,7 +121,8 @@ Classify a waste item from an image.
 | Status | Condition |
 |---|---|
 | `401` | Missing, malformed, or wrong `Authorization: Bearer` token, or `BACKEND_API_KEY` is unset on the server |
-| `400` | Missing `file` field or empty filename |
+| `400` | Empty input, unreadable image, or description over 1,000 characters |
+| `413` | Request exceeds 12 MiB or photo exceeds 32 megapixels |
 
 ## Production Deployment
 
@@ -122,7 +132,7 @@ The [Dockerfile](Dockerfile) builds a slim Python 3.12 image and runs gunicorn:
 
 ```bash
 docker build -t scrapp-backend .
-docker run -p 8000:8000 -e OPENAI_API_KEY=sk-... -e BACKEND_API_KEY=... scrapp-backend
+docker run -p 8000:8000 --env-file .env scrapp-backend
 ```
 
 Gunicorn binds to `$PORT` (default `8000`) with 2 workers and a 60-second timeout.
@@ -130,7 +140,7 @@ Gunicorn binds to `$PORT` (default `8000`) with 2 workers and a 60-second timeou
 ### Railway / Render
 
 1. Connect this repo
-2. Set `OPENAI_API_KEY` and `BACKEND_API_KEY` in environment variables
+2. Set `ADAPTION_API_KEY` (or the alternative `OPENAI_API_KEY`) and `BACKEND_API_KEY` in environment variables
 3. Keep `USE_YOLO=false` (default)
 4. Deploy, the host builds from the Dockerfile automatically
 5. Point the frontend's `NEXT_PRIVATE_BACKEND_URL` at the deployed URL and give it the same `BACKEND_API_KEY`
@@ -139,25 +149,23 @@ CORS is enabled for `https://scrapp.app`, `https://www.scrapp.app`, and `https:/
 
 ## Classifier Details
 
-### GPT-4o-mini vision
+### Image and description classification
 
-- **Implementation:** [final/openai_classifier.py](final/openai_classifier.py)
-- **Model:** `gpt-4o-mini` with structured JSON output
-- **Image handling:** Resized to max 1280px, JPEG quality 85, `detail: high` (all tunable, see the `OPENAI_*` variables above)
-- **Cost:** Approximately $0.001–0.003 per scan at high detail
-- **Fallback:** If the API key is missing, the call times out, or `OPENAI_ENABLED=false`, the classifier returns a heuristic result with `"fallback_used": true` and `"model": "fallback"` instead of failing the request
+[The classifier](final/openai_classifier.py) sends one provider request per scan. Adaption receives a message at `POST https://api.prod.adaptionlabs.ai/api/v1/responses`. A photo is a resized JPEG data URL in an `input_image` part. The optional note and YOLO hints are sent as text. The request sets `store: false`, uses no tools and caps output at 900 tokens. The default Gemma model supports both text and image input. See the [referenced endpoint guide](https://github.com/anyhows/SwarmAlignment26/blob/main/docs/adaption-llm-endpoints.md), [Adaption image input reference](https://docs.adaptionlabs.ai/inference-stacks/generate-a-model-response/) and [hosted model list](https://docs.adaptionlabs.ai/inference-stacks/models/).
 
-To localize disposal rules, edit the system prompt in `openai_classifier.py` with your city or county's actual recycling guidelines.
+OpenAI-only installations use Chat Completions with a JSON schema. Both providers share the same item validation, route and bin vocabulary, camera orientation correction, image resizing and response fields. The client never receives provider keys. Provider errors use the existing detection fallback, with no automatic retries or second paid provider call.
+
+The prompt includes the City's published curbside sorting defaults and asks the model to identify material, condition, and any uncertainty. The frontend pairs the item with local program information. [City of San Diego What Goes Where guide](https://www.sandiego.gov/sites/default/files/what_goes_where_guide_english.pdf) · [City household hazardous waste programs](https://www.sandiego.gov/environmental-services/ep/hazardous)
 
 ### YOLOv8 detection and disposal mapping
 
 The optional YOLO path identifies individual objects in a photo and maps their labels to disposal routes. The current implementation loads the pretrained **YOLOv8x** detector (`yolov8x.pt`); the waste-specific behavior comes from hand-written category mappings, rather than fine-tuned model weights. This repository does not include a custom waste checkpoint or a fine-tuning pipeline.
 
 - **Implementation:** [final/app.py](final/app.py), with class-to-route rules in [final/categories.py](final/categories.py)
-- **Detection:** The model loads once at startup. Each uploaded image is converted to OpenCV's BGR format and passed to YOLO with a confidence threshold of `0.30`. Each detection includes a class name, confidence score, and bounding box in image pixel coordinates.
+- **Detection:** The model loads once at startup. Each uploaded photo is decoded as a PIL RGB image and passed to YOLO with a confidence threshold of `0.30`. Each detection includes a class name, confidence score, and bounding box in image pixel coordinates.
 - **Disposal mapping:** COCO object labels are mapped to routes such as Recycle (`bottle`), Compost (`banana`), and E-Waste (`laptop`). Unmapped labels use `Landfill / Donate / Check rules`. These rules use object labels, so they cannot reliably distinguish materials, contamination, or local recycling exceptions.
 - **Response:** `objects` lists detected labels, `detections` includes boxes and suggested routes, and `bin_totals` counts detections per route.
-- **Working with GPT-4o-mini:** Waste detections are supplied as hints alongside the image and optional user note. People, animals, and city infrastructure are excluded from those hints. GPT-4o-mini can correct the detections and provide more specific disposal guidance. If OpenAI is disabled or unavailable, the same waste detections provide the fallback items and default San Diego bin assignments; without detections, the fallback asks for a clearer photo or a local-rules check.
+- The selected vision provider receives waste detections as hints and can correct them using the photo or description. If the provider is unavailable, the same detections supply the fallback items.
 
 To enable YOLO locally, install the additional dependencies and set the flag before starting the backend:
 
