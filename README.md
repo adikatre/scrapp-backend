@@ -1,13 +1,13 @@
 # Scrapp Backend
 
-Flask API that powers [Scrapp](https://github.com/adikatre/scrapp) waste classification. Accepts an image (and optional text note), runs the configured vision model, and returns structured disposal guidance.
+Flask API that powers [Scrapp](https://github.com/adikatre/scrapp) waste classification. Accepts an image (and optional text note), runs GPT-4o-mini vision, and returns structured disposal guidance.
 
 **Frontend:** [github.com/adikatre/scrapp](https://github.com/adikatre/scrapp)
 
 ## Overview
 
 - `POST /predict`, classify a waste item from a photo
-- **Primary classifier:** Configurable vision model ([openai_classifier.py](final/openai_classifier.py)), defaulting to `qwen3.5-397b`, with structured JSON containing item name, material, disposal route, confidence, caveats, and Places search queries
+- **Primary classifier:** GPT-4o-mini vision ([openai_classifier.py](final/openai_classifier.py)), structured JSON with item name, material, disposal route, confidence, caveats, and Places search queries
 - **Optional:** YOLOv8 object detection behind `USE_YOLO=true` (off by default; requires extra dependencies and ~2–4 GB RAM; not used in production)
 - **Auth:** every request needs `Authorization: Bearer $BACKEND_API_KEY` (see [Authentication](#authentication))
 
@@ -39,12 +39,12 @@ Set the identical value on the backend host and in the frontend's environment.
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `OPENAI_API_KEY` | Yes |, | Vision model API calls |
+| `OPENAI_API_KEY` | Yes |, | GPT-4o-mini vision API calls |
 | `BACKEND_API_KEY` | Yes |, | Shared bearer secret the frontend must send; unset means every request `401`s |
 | `USE_YOLO` | No | `false` | Enable YOLOv8 detection (needs `ultralytics`, `opencv-python-headless`, and significant RAM) |
 | `CORS_ORIGINS` | No |, | Comma-separated extra allowed origins, added to the production defaults below |
 | `OPENAI_ENABLED` | No | `true` | Set false to skip the API call and return the heuristic fallback |
-| `OPENAI_MODEL` | No | `qwen3.5-397b` | Vision model id |
+| `OPENAI_MODEL` | No | `gpt-4o-mini` | Vision model id |
 | `OPENAI_IMAGE_DETAIL` | No | `high` | `high` or `low`, `low` is cheaper and coarser |
 | `OPENAI_TIMEOUT_SECONDS` | No | `20` | Per-request timeout before falling back |
 | `OPENAI_MAX_IMAGE_SIZE` | No | `1280` | Longest edge, in px, images are resized to |
@@ -93,7 +93,7 @@ Classify a waste item from an image.
   ],
   "text": "This appears to be a #5 plastic yogurt cup. Rinse it and check whether your curbside program accepts #5 plastics.",
   "classifier": {
-    "model": "qwen3.5-397b",
+    "model": "gpt-4o-mini",
     "source": "openai",
     "fallback_used": false
   },
@@ -139,12 +139,12 @@ CORS is enabled for `https://scrapp.app`, `https://www.scrapp.app`, and `https:/
 
 ## Classifier Details
 
-### Vision classifier
+### GPT-4o-mini vision
 
 - **Implementation:** [final/openai_classifier.py](final/openai_classifier.py)
-- **Model:** `qwen3.5-397b` by default, configurable with `OPENAI_MODEL`, with structured JSON output
+- **Model:** `gpt-4o-mini` with structured JSON output
 - **Image handling:** Resized to max 1280px, JPEG quality 85, `detail: high` (all tunable, see the `OPENAI_*` variables above)
-- **Cost:** Provider-dependent
+- **Cost:** Approximately $0.001–0.003 per scan at high detail
 - **Fallback:** If the API key is missing, the call times out, or `OPENAI_ENABLED=false`, the classifier returns a heuristic result with `"fallback_used": true` and `"model": "fallback"` instead of failing the request
 
 To localize disposal rules, edit the system prompt in `openai_classifier.py` with your city or county's actual recycling guidelines.
@@ -157,7 +157,7 @@ The optional YOLO path identifies individual objects in a photo and maps their l
 - **Detection:** The model loads once at startup. Each uploaded image is converted to OpenCV's BGR format and passed to YOLO with a confidence threshold of `0.30`. Each detection includes a class name, confidence score, and bounding box in image pixel coordinates.
 - **Disposal mapping:** COCO object labels are mapped to routes such as Recycle (`bottle`), Compost (`banana`), and E-Waste (`laptop`). Unmapped labels use `Landfill / Donate / Check rules`. These rules use object labels, so they cannot reliably distinguish materials, contamination, or local recycling exceptions.
 - **Response:** `objects` lists detected labels, `detections` includes boxes and suggested routes, and `bin_totals` counts detections per route.
-- **Working with the vision model:** Waste detections are supplied as hints alongside the image and optional user note. People, animals, and city infrastructure are excluded from those hints. The configured model can correct the detections and provide more specific disposal guidance. If the classifier is disabled or unavailable, the same waste detections provide the fallback items and default San Diego bin assignments; without detections, the fallback asks for a clearer photo or a local-rules check.
+- **Working with GPT-4o-mini:** Waste detections are supplied as hints alongside the image and optional user note. People, animals, and city infrastructure are excluded from those hints. GPT-4o-mini can correct the detections and provide more specific disposal guidance. If OpenAI is disabled or unavailable, the same waste detections provide the fallback items and default San Diego bin assignments; without detections, the fallback asks for a clearer photo or a local-rules check.
 
 To enable YOLO locally, install the additional dependencies and set the flag before starting the backend:
 

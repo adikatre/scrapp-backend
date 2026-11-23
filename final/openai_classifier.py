@@ -31,7 +31,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "qwen3.5-397b"
+DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_IMAGE_DETAIL = "high"
 DEFAULT_TIMEOUT_SECONDS = 20
 DEFAULT_MAX_IMAGE_SIZE = 1280
